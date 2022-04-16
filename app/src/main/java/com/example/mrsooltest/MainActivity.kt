@@ -2,6 +2,7 @@ package com.example.mrsooltest
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
@@ -13,30 +14,33 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.viewpager2.widget.ViewPager2
 import com.example.mrsooltest.adapters.BillionairesAdapter
 import com.example.mrsooltest.databinding.ActivityMainBinding
 import com.example.mrsooltest.interfaces.BillionaireLIstItemClickHandler
 import com.example.mrsooltest.models.Billionaire
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+
 import retrofit2.Call
 import retrofit2.Callback
-import retrofit2.HttpException
 import retrofit2.Response
-import java.io.IOException
+
+import io.flutter.embedding.android.FlutterActivity;
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
+import io.flutter.embedding.engine.dart.DartExecutor
+import io.flutter.plugin.common.MethodChannel
 
 
-const val TAG = "MainActivity";
+const val TAG = "MainActivity"
+const val FLUTTER_ENGINE_ID = "flutter_engine_id"
 
 class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var billionairesAdapter: BillionairesAdapter
+
+    private var flutterEngine: FlutterEngine? = null
 
     val limit = 50
     var isLoadingMore = false
@@ -44,12 +48,13 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
     var isLastPage = false
     var currentPage = 1
     var currentItemsLength = 0
+    var billionaireJson = ""
 
 
-    private val scrollListener = object : RecyclerView.OnScrollListener(){
+    private val scrollListener = object : RecyclerView.OnScrollListener() {
         override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
             super.onScrollStateChanged(recyclerView, newState)
-            if(newState == AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL){
+            if (newState == AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL) {
                 isScrolling = true
             }
         }
@@ -66,8 +71,8 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
 
             val shouldPaginate = !isLoadingMore && isAtListEnd && !isLastPage
 
-            if(shouldPaginate){
-                Log.e(TAG, "onScrolled: loading", )
+            if (shouldPaginate) {
+                Log.e(TAG, "onScrolled: loading")
                 currentPage++
 
                 isLoadingMore = true
@@ -77,6 +82,11 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
             }
 
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        initFlutterEngine()
     }
 
 
@@ -89,7 +99,11 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
         initBillionairesRecyclerView()
         binding.rvBillionaires.addOnScrollListener(scrollListener)
 
+
+
         getBillionaires(currentPage * limit)
+
+
     }
 
 
@@ -124,9 +138,9 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
 
     private fun getBillionaires(limit: Int) {
 //
-        if(isLoadingMore){
+        if (isLoadingMore) {
             binding.progressBarLoadingMore.isVisible = true
-        }else{
+        } else {
             binding.progressBar.isVisible = true
         }
 
@@ -154,7 +168,7 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
 
 
 
-                        if(currentItemsLength == billionairesAdapter.itemCount){
+                        if (currentItemsLength == billionairesAdapter.itemCount) {
                             isLastPage = true
                         }
 
@@ -198,13 +212,50 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
 
     }
 
+    private fun initFlutterEngine() {
+
+        flutterEngine = FlutterEngine(this)
+
+
+        MethodChannel(
+            flutterEngine?.dartExecutor?.binaryMessenger,
+            "data_channel"
+        ).setMethodCallHandler { call, result ->
+            if (call.method == "getBillionaireJson") {
+                result.success(billionaireJson)
+
+            }
+        }
+
+        // Start executing Dart code to pre-warm the FlutterEngine.
+        flutterEngine?.dartExecutor?.executeDartEntrypoint(
+            DartExecutor.DartEntrypoint.createDefault()
+        )
+
+        // Cache the FlutterEngine to be used by FlutterActivity.
+        FlutterEngineCache
+            .getInstance()
+            .put(FLUTTER_ENGINE_ID, flutterEngine)
+
+    }
+
     override fun onItemClicked(position: Int, billionaire: Billionaire) {
-
-        val intent = Intent(this, DetailsActivity::class.java)
         val gson = Gson()
-        val billionaireJson = gson.toJson(billionaire)
+        billionaireJson = gson.toJson(billionaire)
 
-        intent.putExtra("billionaire", billionaireJson)
-        startActivity(intent)
+        val flutterIntent = FlutterActivity
+            .withCachedEngine(FLUTTER_ENGINE_ID)
+            .build(this)
+
+
+
+        startActivity(flutterIntent)
+
+
+//        val intent = Intent(this, DetailsActivity::class.java)
+
+//
+//        intent.putExtra("billionaire", billionaireJson)
+//        startActivity(intent)
     }
 }
