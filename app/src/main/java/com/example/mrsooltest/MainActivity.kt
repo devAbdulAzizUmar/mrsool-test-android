@@ -1,14 +1,11 @@
 package com.example.mrsooltest
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.AbsListView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
@@ -20,27 +17,27 @@ import com.example.mrsooltest.interfaces.BillionaireLIstItemClickHandler
 import com.example.mrsooltest.models.Billionaire
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
-
-import io.flutter.embedding.android.FlutterActivity;
+import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodChannel
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 
 const val TAG = "MainActivity"
 const val FLUTTER_ENGINE_ID = "flutter_engine_id"
+const val METHOD_CHANNEL = "method_channel"
 
 class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var billionairesAdapter: BillionairesAdapter
 
-    private var flutterEngine: FlutterEngine? = null
+    private lateinit var flutterEngine: FlutterEngine
+    private lateinit var flutterMethodChannel: MethodChannel
 
     val limit = 50
     var isLoadingMore = false
@@ -48,7 +45,7 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
     var isLastPage = false
     var currentPage = 1
     var currentItemsLength = 0
-    var billionaireJson = ""
+    private var billionaireJson = ""
 
 
     private val scrollListener = object : RecyclerView.OnScrollListener() {
@@ -84,11 +81,6 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        initFlutterEngine()
-    }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -99,10 +91,13 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
         initBillionairesRecyclerView()
         binding.rvBillionaires.addOnScrollListener(scrollListener)
 
-
-
         getBillionaires(currentPage * limit)
+        initFlutterEngine()
 
+
+    }
+
+    override fun onBackPressed() {
 
     }
 
@@ -137,7 +132,7 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
     }
 
     private fun getBillionaires(limit: Int) {
-//
+        setError(false)
         if (isLoadingMore) {
             binding.progressBarLoadingMore.isVisible = true
         } else {
@@ -216,21 +211,22 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
 
         flutterEngine = FlutterEngine(this)
 
+        flutterMethodChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            METHOD_CHANNEL
+        )
 
-        MethodChannel(
-            flutterEngine?.dartExecutor?.binaryMessenger,
-            "data_channel"
-        ).setMethodCallHandler { call, result ->
+        flutterMethodChannel.setMethodCallHandler { call, result ->
             if (call.method == "getBillionaireJson") {
                 result.success(billionaireJson)
-
             }
         }
 
         // Start executing Dart code to pre-warm the FlutterEngine.
-        flutterEngine?.dartExecutor?.executeDartEntrypoint(
+        flutterEngine.dartExecutor.executeDartEntrypoint(
             DartExecutor.DartEntrypoint.createDefault()
         )
+
 
         // Cache the FlutterEngine to be used by FlutterActivity.
         FlutterEngineCache
@@ -242,12 +238,12 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
     override fun onItemClicked(position: Int, billionaire: Billionaire) {
         val gson = Gson()
         billionaireJson = gson.toJson(billionaire)
+        flutterMethodChannel.invokeMethod("refresh", null)
+
 
         val flutterIntent = FlutterActivity
             .withCachedEngine(FLUTTER_ENGINE_ID)
             .build(this)
-
-
 
         startActivity(flutterIntent)
 
