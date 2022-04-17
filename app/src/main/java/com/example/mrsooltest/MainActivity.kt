@@ -90,16 +90,13 @@ class MainActivity : AppCompatActivity(), BillionaireLIstItemClickHandler {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         initBillionairesRecyclerView()
         binding.rvBillionaires.addOnScrollListener(scrollListener)
-
-        getBillionaires(currentPage * limit)
         initFlutterEngine()
+        getBillionaires(currentPage * limit)
 
 
-    }
-
-    override fun onBackPressed() {
 
     }
+ 
 
 
     private fun initBillionairesRecyclerView() {

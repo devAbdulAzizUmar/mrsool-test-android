@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/billionaire.dart';
 import '../utils.dart';
@@ -19,6 +20,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
   Billionaire? billionaire;
   late TextStyle headingStyle;
   static const methodChannel = MethodChannel("method_channel");
+  final scrollController = ScrollController();
 
   String data = "";
 
@@ -31,6 +33,12 @@ class _DetailsScreenState extends State<DetailsScreen> {
   void initState() {
     super.initState();
     listenToNativeCalls();
+  }
+
+  @override
+  void dispose() {
+    scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -61,6 +69,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
                   child: Text("Failed to get data"),
                 )
               : SingleChildScrollView(
+                  controller: scrollController,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -165,7 +174,9 @@ class _DetailsScreenState extends State<DetailsScreen> {
     return [
       TextButton(
         child: Text("More info: $moreInfoLink"),
-        onPressed: () {},
+        onPressed: () {
+          onMoreInfoUrl(moreInfoLink);
+        },
       )
     ];
   }
@@ -261,7 +272,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
     return assetRows;
   }
 
-  void getBillionaireData() async {
+  Future<void> getBillionaireData() async {
     setState(() {
       isLoading = true;
     });
@@ -279,11 +290,21 @@ class _DetailsScreenState extends State<DetailsScreen> {
     });
   }
 
-  void listenToNativeCalls() {
+  void listenToNativeCalls() async {
     methodChannel.setMethodCallHandler((call) async {
       if (call.method == 'refresh') {
-        getBillionaireData();
+        await getBillionaireData();
+
+        scrollController.jumpTo(
+          scrollController.position.minScrollExtent,
+        );
       }
     });
+  }
+
+  void onMoreInfoUrl(String moreInfoLink) async {
+    if (await canLaunch(moreInfoLink)) {
+      launch(moreInfoLink);
+    }
   }
 }
